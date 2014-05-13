@@ -1,0 +1,1290 @@
+<?php
+
+/**
+ * @file
+ * Administration of schedule upload and display for X-Ray Associates radiologist group.
+ * Märt Matsoo. mart@matsoo.com.
+ */
+
+
+/**
+ * Implementation of hook_init
+ */
+function sked_init() {
+
+  // Load includes.
+  module_load_include('inc', 'sked', 'includes/sked_csv_upload');
+
+  // Load css.
+  drupal_add_css(drupal_get_path('module', 'sked') . '/css/sked.css');
+
+  // Assigning these here to avoid php error when doing isset(arg(0)) check.
+  $arg0 = arg(0);
+  $arg1 = arg(1);
+  $arg2 = arg(2);
+
+  $sked_settings = array();
+  $sked_settings['arg0'] = (isset($arg0)) ? $arg0 : 0;
+  $sked_settings['arg1'] = (isset($arg1)) ? $arg1 : 0;
+  $sked_settings['arg2'] = (isset($arg2)) ? $arg2 : 0;
+
+  // Add settings to Drupal.settings object.
+  drupal_add_js(array('sked' => $sked_settings), 'setting');
+
+  // Load js.
+  drupal_add_js(drupal_get_path('module', 'sked') . '/js/sked.js');
+
+
+  //drupal_add_js('jQuery(document).ready(function () { var S5 = "do this and do that";//alert(S5); });', array('type' => 'inline', 'scope' => 'header'));
+}
+
+
+/**
+ * Implementation of hook_permission().
+ */
+function sked_permission() {
+
+  $perms = array(
+    'admin xray schedule' => array(
+      'title' => t('Admin X-Ray Schedule'),
+      'description' => t('Full administrator access for schedule-related options.'),
+      'restrict access' => TRUE,
+    ),
+  );
+
+  return $perms;
+
+}
+
+
+
+/**
+ * Implements hook_user_login.
+ * Taken from: http://api.drupal.org/api/drupal/modules%21user%21user.api.php/function/hook_user_login/7
+ */
+function sked_user_login(&$edit, $account) {
+
+  // Just in case, clear out $_GET['destination'].
+  if (isset($_GET['destination'])):
+    unset($_GET['destination']);
+  endif;
+
+  // Redirect South Lake, Mackenzie and Clinic roles directly to schedule page for that location.
+  // south lake calendar-work-date-ts-sl/month
+  // mackenzie calendar-work-date-ts-mh/month
+  // clinic calendar-work-date-ts-clinic/month
+
+  if (in_array('south lake', array_values($account->roles))):
+    $redirection = 'calendar-work-date-ts-sl/month';
+  endif;
+
+  if (in_array('mackenzie health', array_values($account->roles))):
+    $redirection = 'calendar-work-date-ts-mh/month';
+  endif;
+
+  if (in_array('clinic', array_values($account->roles))):
+    $redirection = 'calendar-work-date-ts-clinic/month';
+  endif;
+
+  if (in_array('rad', array_values($account->roles))):
+    $redirection = variable_get('xray_login_redirect', 'node/2');
+  endif;
+
+  // Unless there is already a redirection going, or the user is trying to reset his password, we redirect to $redirection.
+  if (!is_null($redirection)) {
+      $edit['redirect'] = $redirection;
+  }
+}
+
+
+
+
+/**
+ * Implementation of hook_menu().
+ */
+function sked_menu() {
+
+  $items = array();
+
+  $items['sked/location-shifts/ych'] = array(
+    'title' => 'YCH Shifts',
+    'description' => t('Redirect to schedule page for YCH (C).'),
+    'menu_name' => 'main-menu',
+    'access callback' => TRUE,
+    // 'access arguments' => array('admin xray schedule'),
+    'page callback' => 'sked_goto_location_shifts',
+    'page arguments' => array(2),
+    'type' => MENU_NORMAL_ITEM,
+  );
+
+  $items['sked/location-shifts/southlake'] = array(
+    'title' => 'Southlake Shifts',
+    'description' => t('Redirect to schedule page for Southlake (S) shifts.'),
+    'menu_name' => 'main-menu',
+    'access callback' => TRUE,
+    // 'access arguments' => array('admin xray schedule'),
+    'page callback' => 'sked_goto_location_shifts',
+    'page arguments' => array(2),
+    'type' => MENU_NORMAL_ITEM,
+  );
+
+  $items['admin/config/sked'] = array(
+    'title' => 'X-Ray Schedule Management',
+    'access arguments' => array('admin xray schedule'),
+    'position' => 'right',
+    'weight' => 69,
+    'page callback' => 'system_admin_menu_block_page',
+    'file' => 'system.admin.inc',
+    'file path' => drupal_get_path('module', 'system'),
+  );
+
+  $items['admin/config/sked/settings'] = array(
+    'title' => 'X-Ray Schedule Settings',
+    'description' => t('General settings form'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('sked_settings'),
+    'access arguments' => array('admin xray schedule'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+
+  $items['admin/config/sked/upload'] = array(
+    'title' => 'Upload Schedule CSV',
+    'description' => t('Upload schedule CSV file.'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('sked_upload_csv'),
+    'access arguments' => array('admin xray schedule'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+
+  $items['admin/config/sked/summary'] = array(
+    'title' => 'Shift Summary',
+    'description' => t('Adding up shift hours per month. Shift reconciliation.'),
+    'page callback' => 'sked_shift_summary',
+    'access arguments' => array('admin xray schedule'),
+    'file' => 'includes/sked_shift_summary.inc',
+    'file path' => drupal_get_path('module', 'sked'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+
+  $items['admin/config/sked/duplicate'] = array(
+    'title' => 'Check for duplicate shifts',
+    'description' => t('YYYY-MM in URL (ex. admin/config/sked/duplicate/@date/month) determines which month is being checked.', array('@date' => date('Y-m', time()))),
+    'page callback' => 'sked_duplicate_shift_check',
+    'access arguments' => array('admin xray schedule'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+
+  $items['admin/config/sked/missing'] = array(
+    'title' => 'Check for missing shifts',
+    'description' => t('Uses the assigned shift days to make sure no shifts are missing for the month. YYYY-MM in URL (ex. admin/config/sked/missing/@date/month) determines which month is being checked.', array('@date' => date('Y-m', time()))),
+    'page callback' => 'sked_missing_shift_check',
+    'access arguments' => array('admin xray schedule'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+
+  $items['admin/config/sked/shiftdays'] = array(
+    'title' => 'Assign Shifts to Days of Week',
+    'description' => t('Certain days are expected to have certain shifts. System can use this to find if there are days with missing shifts.'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('sked_shift_assign_day'),
+    'access arguments' => array('admin xray schedule'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+
+  return $items;
+
+}
+
+
+/**
+ * Redirect user to schedule page for either YCH or Southlake.
+ */
+function sked_goto_location_shifts($ych_sl = 'ych') {
+
+  if ($ych_sl == 'ych') {
+    drupal_goto('shift-calendar-work-date-ts/month/' . date('Y-m') . '/C');
+  }
+  else {
+    drupal_goto('shift-calendar-work-date-ts/month/' . date('Y-m') . '/S');
+  }
+
+}
+
+
+/**
+ * Form to administer which shifts are expected on which days.
+ */
+function sked_shift_assign_day($form, &$form_state) {
+
+  $form = array();
+  $shifts = _sked_build_shift_dropdown_options();
+  $day_names = array(0 => t('Sun'), 1 => t('Mon'), 2 => t('Tue'), 3 => t('Wed'), 4 => t('Thu'), 5 => t('Fri'), 6 => t('Sat'));
+
+  for ($counter = 0;$counter < 7;$counter++) {
+
+    switch ($counter) {
+      case 0:
+        $first_or_last = 'first';
+        break;
+      case 6:
+        $first_or_last = 'last';
+        break;
+      default:
+        $first_or_last = 'interior';
+        break;
+    }
+
+    $form['shift_day_open_' . $counter] = array(
+      '#markup' => '<div class="shift-day-wrapper ' . $first_or_last . '"><h3>' . $day_names[$counter] . '</h3>',
+    );
+    
+    // Reset shifts array.
+    reset($shifts);
+
+    foreach ($shifts as $key => $value) {
+      if (strstr($key, '*') === FALSE): // strlen($key) <= 2 && 
+        $form['shift_day_' . $key . '_' . $counter] = array(
+          '#type' => 'checkbox',
+          '#title' => t($value),
+          '#default_value' => variable_get('shift_day_' . $key . '_' . $counter, 0),
+          '#description' => t($key . ' on ' . $day_names[$counter]),
+        );
+      endif;
+    }
+  
+    $form['shift_day_close' . $counter] = array(
+      '#markup' => '</div>',
+    );    
+
+  }
+
+  return system_settings_form($form);
+
+}
+
+
+/**
+ * Implements hook_entity_info.
+ */
+
+// Started going by http://www.istos.it/blog/drupal-entities/drupal-entities-part-3-programming-hello-drupal-entity
+function sked_entity_info() {
+// @TODO. This probably needs to be beefier and I am not sure it is all correct. (ie. bundles)
+  $return = array(
+    'xray_sked' => array(
+      'label' => t('X-Ray Schedule'),
+      'base table' => 'xray_sked',
+      'entity keys' => array(
+        'id' => 'sid',
+      ),
+      'uri callback' => 'sked_uri',
+      'bundles' => array(
+        'xray'=> array(
+          'label' => 'X-Ray',
+          'admin' => array(
+            'path' => 'admin/config/sked/settings',
+            'access arguments' => array('admin xray schedule'),
+          ),
+        ),
+      ),
+    ),
+  );
+
+  return $return;
+}
+
+// See http://www.istos.it/blog/drupal-entities/drupal-entities-part-3-programming-hello-drupal-entity
+function sked_uri(){
+  return array(
+    'path' => 'sked/0',
+  );
+}
+
+
+/**
+ * Let Views know to look for include file.
+ */
+function sked_views_api() {
+  return array(
+    'api' => 3,
+    'path' => drupal_get_path('module', 'sked') . '/includes/views',
+  );
+}
+
+
+/**
+ * Form builder for general settings form.
+ */
+function sked_settings($form, &$form_state) {
+
+  $form = array();
+
+  $form['xray_test_mode'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Test mode'),
+    '#default_value' => variable_get('xray_test_mode', 0),
+    '#description' => t('Just here as stub for settings form.'),
+  );
+
+  $form['xray_test_rad_id_to_use'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Show Info for Rad with Drupal User ID...'),
+    '#default_value' => variable_get('xray_test_rad_id_to_use', 2), // 2 is Drupal uid for Silmberg.
+    '#size' => 1,
+    '#description' => t('While testing mode is turned on, info will be displayed as if this Drupal user is the logged in user. Default value of 2 is the user id that corresponds with Silmberg.'),
+  );
+
+  $form['xray_login_redirect'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Login Redirect'),
+    '#default_value' => variable_get('xray_login_redirect', 'node/2'), // node/2 is stub for My Schedule
+    '#size' => 40,
+    '#description' => t('Page we want user to visit once they log in. Default is node/2.'),
+  );
+
+  $form['xray_dayoff_id'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Node ID for X rotation (day off)'),
+    '#default_value' => variable_get('xray_dayoff_id', 32),
+    '#size' => 1,
+    '#description' => t('X rotation is treated as a day off. At time of development, 32 was node id for day off.'),
+  );
+
+  $form['xray_unknown_rotation_id'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Node ID for unknown rotation'),
+    '#default_value' => variable_get('xray_unknown_rotation_id', 36),
+    '#size' => 1,
+    '#description' => t('Catch-all in case we have codes the system does not recognise. At time of development, 36 was node id for unknown rotation.'),
+  );
+
+  return system_settings_form($form);
+}
+
+/**
+UPLOAD NOTES
+csv file might be messy with lots of extra fields so program defensively.
+1. make sure doc id exists and is valid
+2. Match month with number of days to loop through, don't go beyond 31 no matter what (Erik puts stuff into columns beyond the scheduling days)      
+3. Make sure shift code is valid. How do I do this? The current shiftcode has almost 200 distinct codes! Erik combines them as he sees fit.
+ */
+
+
+/**
+ * Form builder for csv upload.
+ */
+function sked_upload_csv($form, &$form_state) {
+
+  // Going to upload so need this as a form attribute.
+  $form['#attributes']['enctype'] = 'multipart/form-data';
+
+  $form['upload'] = array(
+    '#type' => 'file',    
+    '#title' => t('Select CSV file'),
+    '#description' => t('CSV file is expected to hold shift information for a single month.'),
+    '#name' => 'upload',
+    '#size' => 22,
+    '#theme_wrappers' => array(),
+  );
+
+  $form['submit'] = array(
+    '#type' => 'submit', 
+    '#value' => t('Upload')
+  );
+
+  return $form;
+}
+
+// What about PE*, VD, PC1V*, QQBB ???
+function sked_upload_csv_validate($form, &$form_state) {
+
+  $bad_file = _sked_csv_upload_reject_csv($form, $form_state);
+
+  if ($bad_file):
+    form_set_error('upload', t('CSV file does not match expected format.'));
+  endif;
+
+}
+
+
+function sked_upload_csv_submit($form, &$form_state) {
+  _sked_csv_upload_save_sked_info($form, $form_state);
+}
+
+
+/**
+ * Implements hook_block_info().
+ */
+function sked_block_info() {
+
+  $blocks = array();
+
+  $blocks['my_shift'] = array(
+    'info' => t('Current rad\'s shift info.'),
+  );
+
+  $blocks['rounds'] = array(
+    'info' => t('Rounds info'),
+  );
+
+  $blocks['shift_schedule_dd'] = array(
+    'info' => t('Shift code schedule by month'),
+  );
+
+  $blocks['rad_schedule_dd'] = array(
+    'info' => t('Rad schedule by month'),
+  );
+
+  $blocks['duplicates'] = array(
+    'info' => t('Duplicate shift info'),
+  );
+
+  $blocks['missing_shifts'] = array(
+    'info' => t('Missing shift info'),
+  );
+
+  $blocks['jump_to_month_dd'] = array(
+    'info' => t('Jump forward or back several months'),
+  );
+
+  return $blocks;
+}
+
+
+/**
+ * Implements hook_block_view().
+ */
+function sked_block_view($delta = '') {
+
+  $block = array();
+
+  switch ($delta) {
+
+    case 'my_shift':
+      $block['subject'] = t('My Shift');
+      $block['content'] = _sked_build_shift();
+      break;
+
+    case 'rounds':
+      $block['subject'] = t('Rounds');
+      $block['content'] = _sked_build_round();
+      break;
+
+    case 'shift_schedule_dd':
+      global $user;
+      if ($user->uid !== 0):
+        $block['subject'] = t('Check Shift');
+        $block['content'] = drupal_get_form('_sked_build_shift_dropdown');
+      endif;
+      break;
+
+    case 'rad_schedule_dd':
+      global $user;
+      if ($user->uid !== 0):
+        $block['subject'] = t('Check Other Rad');
+        $block['content'] = drupal_get_form('_sked_build_rad_dropdown');
+      endif;
+      break;
+
+    case 'duplicates':
+      global $user;
+      // Check to see if $user has the admin role.
+      if (in_array('admin', array_values($user->roles))):
+        $block['subject'] = t('Duplicate Shifts');
+        // Duplicate shift check returns an object.
+        $objDuplicate = sked_duplicate_shift_check(arg(2), 'month'); // arg(2) has format of 2013-07.
+        $block['content'] = $objDuplicate->strOutput;
+      endif;
+      break;
+
+    case 'missing_shifts':
+      global $user;
+      // Check to see if $user has the admin role.
+      if (in_array('admin', array_values($user->roles))):
+        $block['subject'] = t('Missing Shifts');
+        // Missing shift check returns an object.
+        $objMissing = sked_missing_shift_check(arg(2), 'month'); // arg(2) has format of 2013-07.
+        $block['content'] = $objMissing->strOutput;
+      endif;
+      break;
+
+    case 'jump_to_month_dd':
+        $block['subject'] = t('Jump to');
+        $block['content'] = drupal_get_form('_sked_build_jump_to_dd');
+      break;
+  }
+
+  return $block;
+}
+
+
+/**
+ * Build dropdown for rads to skip to specific months.
+ */
+function _sked_build_jump_to_dd() {
+
+  // Get default value for dropdown.
+  $arg2 = arg(2);
+  $default_value = (isset($arg2)) ? $arg2 : date('Y-m');
+
+  $form['jump-month'] = array(
+    '#type' => 'select',
+    '#options' => _sked_build_jump_to_dropdown_options(),
+    '#description' => '',
+    '#default_value' => $default_value, //date('Y-m'),
+    '#required' => TRUE,
+  );
+
+  $form['jump-submit'] = array(
+    '#type' => 'submit',
+    '#weight' => 100,
+    '#value' => t('Go')
+  );
+
+  return $form;
+
+}
+
+
+
+/**
+ * Helper function to jump back or forward 6 months.
+ */
+function _sked_build_jump_to_dropdown_options() {
+
+  $options = array(
+    date('Y-m', strtotime('6 months ago', time())) => date('M Y', strtotime('6 months ago', time())),
+    date('Y-m', strtotime('5 months ago', time())) => date('M Y', strtotime('5 months ago', time())),
+    date('Y-m', strtotime('4 months ago', time())) => date('M Y', strtotime('4 months ago', time())),
+    date('Y-m', strtotime('3 months ago', time())) => date('M Y', strtotime('3 months ago', time())),
+    date('Y-m', strtotime('2 months ago', time())) => date('M Y', strtotime('2 months ago', time())),
+    date('Y-m', strtotime('1 month ago', time())) => date('M Y', strtotime('1 month ago', time())),
+    date('Y-m') => date('M Y'),
+    date('Y-m', strtotime('+1 month', time())) => date('M Y', strtotime('+1 month', time())),
+    date('Y-m', strtotime('+2 months', time())) => date('M Y', strtotime('+2 months', time())),
+    date('Y-m', strtotime('+3 months', time())) => date('M Y', strtotime('+3 months', time())),
+    date('Y-m', strtotime('+4 months', time())) => date('M Y', strtotime('+4 months', time())),
+    date('Y-m', strtotime('+5 months', time())) => date('M Y', strtotime('+5 months', time())),
+    date('Y-m', strtotime('+6 months', time())) => date('M Y', strtotime('+6 months', time())),
+  );
+
+  return $options;
+
+}
+
+
+
+/**
+ * Build shift dropdown which takes user to schedule page for that shift.
+ */
+function _sked_build_rad_dropdown() {
+
+  $form['rad'] = array(
+    '#type' => 'select',
+    '#options' => _sked_build_rad_dropdown_options(),
+    '#description' => t('Choose Rad then "Go"'),
+    '#required' => TRUE,
+  );
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#weight' => 100,
+    '#value' => t('Go')
+  );
+
+  return $form;
+
+}
+
+
+
+/**
+ * Build shift dropdown which takes user to schedule page for that shift.
+ */
+function _sked_build_shift_dropdown() {
+
+  $form['shift'] = array(
+    '#type' => 'select',
+    '#options' => _sked_build_shift_dropdown_options(),
+    '#description' => t('Choose Shift then "Go"'),
+    '#required' => TRUE,
+  );
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#weight' => 100,
+    '#value' => t('Go')
+  );
+
+  return $form;
+
+}
+
+
+/**
+ * Submit function.
+ */
+function _sked_build_shift_dropdown_submit($form_id, &$form_state) {
+  $url = 'shift-calendar-work-date-ts/month/' . date('Y-m') . '/' . $form_state['values']['shift'];
+  drupal_goto($url);
+}
+
+
+
+/**
+ * Submit function.
+ */
+function _sked_build_rad_dropdown_submit($form_id, &$form_state) {
+  $url = 'rad-shift-calendar-work-date-ts/' . date('Y-m') . '/' . $form_state['values']['rad'];
+  drupal_goto($url);
+}
+
+
+
+
+/**
+ * Build rad dropdown options.
+ */
+function _sked_build_rad_dropdown_options() {
+
+  $query = db_select('users', 'u');
+  $query->join('users_roles', 'ur', 'u.uid = ur.uid');
+
+  $query
+    ->condition('status', '1', '=')
+    ->condition('rid', '4', '=')
+    ->fields('u', array('uid', 'name'))
+    ->orderBy('name');
+
+  $result = $query->execute();
+
+  $options = array();
+
+  foreach($result as $row) {
+    $options[$row->uid] = $row->name;
+  }
+
+  return $options;
+
+}
+
+
+
+/**
+ * Build shift dropdown options.
+ * Takes all shift codes from xray_sked table.
+ */
+function _sked_build_shift_dropdown_options() {
+
+  $query = new EntityFieldQuery();
+    $query
+      ->entityCondition('entity_type', 'node', '=')
+      ->propertyCondition('type', 'rotation', '=')
+      ->propertyCondition('status', 1, '=')
+      ->propertyOrderBy('title	', 'ASC');
+
+  $result = $query->execute();
+
+  $nids = array_keys($result['node']);
+  $shifts = entity_load('node', $nids);
+
+  foreach ($shifts as $key => $value) {
+    $options[$value->field_shift_code['und'][0]['safe_value']] = $value->field_shift_code['und'][0]['safe_value'];
+  }
+
+  ksort($options);
+
+  return $options;
+
+}
+
+
+
+/**
+ * Build html output for custom block that has current rad's shift info.
+ */
+function _sked_build_shift() {
+
+  global $user;
+
+  $current_rad_id = $user->uid;
+
+  $shift_nid = db_query("SELECT nid FROM {xray_sked} WHERE uid = :uid AND work_date = :today AND code_type LIKE :rotation", array(':uid' => $current_rad_id, ':today' => date('Y-m-d'), ':rotation' => 'rotation'))->fetchField();
+
+  if ($shift_nid) {
+  
+    $node = node_load($shift_nid);
+
+    $strOutput = '<h3>' . $node->field_shift_code['und'][0]['safe_value'] . '</h3>';
+    $strOutput .= $node->body['und'][0]['safe_value'];
+  }
+  else {
+    $strOutput = '<h3 class="error missing">' . t('No Shift Today') . '</h3><p>' . t('According to the system, you are not working today!') . '</p>';  
+  }
+
+
+  return $strOutput;
+
+}  
+  
+
+/**
+ * Build html output for custom block that has current rad's shift info.
+ */
+function _sked_build_round() {
+
+  global $user;
+
+  $current_rad_id = $user->uid;
+  $dayoff_id = variable_get('xray_dayoff_id', 32);
+  $unknown_rotation_id = variable_get('xray_unknown_rotation_id', 36);
+
+  $round_name = db_query("SELECT code FROM {xray_sked} WHERE uid = :uid AND work_date = :today AND code_type LIKE :rounds", array(':uid' => $current_rad_id, ':today' => date('Y-m-d'), ':rounds' => 'rounds'))->fetchField();
+
+  // If we get a round name that is not X, then build display.
+  if ($round_name && strtolower($round_name) !== 'x') {
+
+    $strOutput = '<h3>' . $round_name. '</h3>';
+    //$strOutput .= $node->body['und'][0]['safe_value'];
+  }
+  else {
+    $strOutput = '<h3 class="error missing">' . t('No Rounds Today') . '</h3><p>' . t('According to the system, no rounds for you today!') . '</p>';  
+  }
+
+
+  return $strOutput;
+}
+
+
+/**
+ * Implements hook_views_query_alter
+ */
+function sked_views_query_alter(&$view, &$query) {
+  switch ($view->name) {
+    case 'schedule':
+      _sked_shift_code_operator_to_like($view, $query);
+      break;
+  }
+}
+
+
+/**
+ * Changing operator and value to do LIKE '%C7%'
+ * instead of = 'C7'.
+ */
+function _sked_shift_code_operator_to_like($view, $query) {
+  // @TODO. Remove watchdog.
+  // watchdog('sked', 'view <pre>' . print_r($view, true) . '</pre>');
+  //print_r($query);exit;
+
+  if ($view->current_display == 'by_shift'):
+    if ($query->where[0]['conditions'][0]['field'] == 'xray_sked.code' 
+        && $query->where[0]['conditions'][0]['operator'] == '=') {
+
+      $query->where[0]['conditions'][0]['operator'] = 'LIKE';
+      $query->where[0]['conditions'][0]['value'] = '%' . $query->where[0]['conditions'][0]['value'] . '%';
+
+    }
+  endif;
+}
+
+
+/**
+ * Check for duplicate shifts on day or month.
+ * @param
+ *   String. YYYY-MM format.
+ * @param
+ *   String. "day" or "month".
+ */
+function sked_duplicate_shift_check($day = '', $day_or_month = 'month') {
+
+  // Default to this month.
+  if ($day == ''):
+    $year = date('Y', time());
+    $month = date('m', time());
+    $day = $year . '-' . $month . '-01';
+    // Get number of days in the month.
+    $max_days = date('t', strtotime($year . '-' . $month . '-01'));
+    // Properly formatted date for db query.
+    $end = $year . '-' . $month . '-' . $max_days;
+  endif;
+
+  // Are we checking duplicates for just one day or a whole month?
+  if ($day_or_month == 'day') {
+    $result = db_query("SELECT code, COUNT(*) as nums FROM {xray_sked} WHERE code NOT LIKE :x AND work_date = :day GROUP BY code ORDER BY code", array(':x' => 'X', ':day' => $day));
+  }
+  else {
+    // Separate year and month from $day variable. (ex. 2013-07-01)
+    $arrDate = explode('-', $day);
+    $year = $arrDate[0];
+    $month = $arrDate[1];
+    // Get number of days in the month.
+    $max_days = date('t', strtotime($year . '-' . $month . '-01'));
+    // Properly formatted date for db query.
+    $end = $year . '-' . $month . '-' . $max_days;
+      
+    $result = db_query("SELECT code, work_date, COUNT(*) as nums FROM {xray_sked} WHERE code NOT LIKE :x AND work_date >= :start and work_date <= :end GROUP BY code, work_date ORDER BY code", array(':x' => 'X', ':start' => $day, ':end' => $end));
+  }
+
+  $shifts_bad = array();
+  $counter = 0;
+
+  foreach ($result as $row) {
+
+    // Greater than 1 means a duplicate.
+    if ($row->nums > 1) {
+      $shifts_bad[$counter]['code'] = $row->code;
+	  $shifts_bad[$counter]['nums'] = $row->nums;
+      if ($day_or_month == 'day') {
+        $shifts_bad[$counter]['day'] = $day;
+      }
+      else {
+        $shifts_bad[$counter]['day'] = $row->work_date;
+      }
+
+      $counter++;
+    }
+
+  }
+
+  // Create return object that will have properties holding whether duplicates exist, plus specific error message.
+  $objDuplicate = new stdClass();
+  $objDuplicate->flag = 0;
+  $objDuplicate->status = 'status';
+  $objDuplicate->msg = '';
+  $objDuplicate->strOutput = '';
+
+  if (sizeof($shifts_bad) > 0) {
+
+      if ($day_or_month == 'day') {
+        $err_msg = t($day);
+      }
+      else {
+        $err_msg = date('M Y', strtotime($year . '-' . $month . '-01')) . ' ' . t('Duplicate Shifts!');
+      }
+
+      $strOutput = '<h2 class="error">' . $err_msg . '</h2><ul>';
+
+      foreach ($shifts_bad as $key => $value) {
+        $strOutput .= '<li>' . $value['code'] . ' ' . $value['day'] . ' (' . $value['nums'] . ' ' . t('occurrences') . ')</li>';
+      }
+
+      $strOutput .= '</ul>';
+
+      // We have duplicates, load object accordingly.
+      $objDuplicate->flag = 1;
+      $objDuplicate->status = 'error';
+      $objDuplicate->msg = $err_msg;
+      $objDuplicate->strOutput = $strOutput;
+
+  }
+  else {
+
+      if ($day_or_month == 'day') {
+        $strOutput = t('No duplicates found for') . ' ' . t(date('M d, Y', strtotime($day)));
+      }
+      else {
+        $strOutput = t('No duplicates found for') . ' ' . t(date('M Y', strtotime($year . '-' . $month . '-01')));
+      }
+
+      // No duplicates. Do not need to change much from instantiated settings.
+      $objDuplicate->msg = t('No duplicates found.');
+      $objDuplicate->strOutput = $strOutput;
+      
+  }
+
+  return $objDuplicate;
+
+}
+
+
+/**
+ * Check for missing shifts.
+ * @param
+ *   String. YYYY-MM format.
+ * @param
+ *   String. "day" or "month".
+ */
+function sked_missing_shift_check($day = '', $day_or_month = 'month') {
+
+  // Default to this month.
+  if ($day == ''):
+    $year = date('Y', time());
+    $month = date('m', time());
+    $day = $year . '-' . $month . '-01';
+    // Get number of days in the month.
+    $max_days = date('t', strtotime($year . '-' . $month . '-01'));
+    // Properly formatted date for db query.
+    $end = $year . '-' . $month . '-' . $max_days;
+  endif;
+  
+  // Are we checking one day or a whole month?
+  if ($day_or_month == 'day') {
+    $result = db_query("SELECT code, work_date FROM {xray_sked} WHERE code_type LIKE :type AND code NOT LIKE :x AND work_date = :day ORDER BY work_date, code", array(':type' => 'rotation', ':x' => 'X', ':day' => $day));
+  }
+  else {
+    // Separate year and month from $day variable. (ex. 2013-07-01)
+    $arrDate = explode('-', $day);
+    $year = $arrDate[0];
+    $month = $arrDate[1];
+    // Get number of days in the month.
+    $max_days = date('t', strtotime($year . '-' . $month . '-01'));
+    // Properly formatted date for db query.
+    $end = $year . '-' . $month . '-' . $max_days;
+      
+    $result = db_query("SELECT code, work_date FROM {xray_sked} WHERE code_type LIKE :type AND code NOT LIKE :x AND work_date >= :start and work_date <= :end ORDER BY work_date, code", array(':type' => 'rotation', ':x' => 'X', ':start' => $day, ':end' => $end));
+
+  }
+
+
+  $all_shifts_in_month = array();
+  $counter = 0;
+
+  // Load everything into an array for comparison with the "which shifts on which days" settings.
+  foreach ($result as $row) {
+    $all_shifts_in_month[$counter]['code'] = $row->code;
+    $all_shifts_in_month[$counter]['work_date'] = $row->work_date;
+//    print $row->code . ' ' . $row->work_date . ' ' . date('w', strtotime($row->work_date)) . '<br />';
+    $counter++;
+  }
+
+  // @TODO. Figure out how to compare which shift should be on which day and which is missing.
+  //print_r($all_shifts_in_month);exit;
+
+  // shift_day_' . $key . '_' . $counter. ex. shift_day_S2_2 is S2 for a Tuesday.
+
+  // Loop through each day of the month and day by day check for necessary shifts.
+  if ($day_or_month == 'day') {
+    // @TODO. Do something for day.
+    print 'Figure out logic for checking missing shifts in one day.';
+  }
+  else {
+
+    // This will hold final info for which days are missing which shifts.
+    $missing_shifts = array();
+
+    // Going through specified month, day by day, to check required shifts against what is in schedule.
+    for ($x=1;$x <= $max_days;$x++) {
+   
+      // First nine days need to be 01, 02 etc. for date functions.
+      if ($x < 10) {
+        $padded_x = '0' . $x;
+      }
+      else {
+         $padded_x = $x;
+      }
+
+      // 0 = Sunday, 1 = Monday etc.
+      $numeric_day_of_week = date('w', strtotime($year . '-' . $month . '-' . $padded_x));
+
+      // Build query to grab required shifts for this day of week.
+      $query = db_select('variable', 'v');
+
+      // @TODO. This query not very robust. String matching on serialised array.
+      $query
+        ->condition('name', 'shift_day_%_' . $numeric_day_of_week, 'LIKE')
+        ->condition('value', 'i:1;', '=')
+        ->fields('v', array('name', 'value'))
+        ->orderBy('name');
+
+      $result = $query->execute();
+
+      // Instantiate array to fill with required shifts.
+      $required_shifts = array();
+      $counter = 0;
+
+      // Populate array with the shifts expected for this particular day of week. (ie. Thursdays all have S7, S5, S2, C5 etc.)
+      foreach ($result as $row) {
+        $blown_up = explode('_', $row->name);
+        $required_shifts[$counter]['shift'] = $blown_up[2];
+        $required_shifts[$counter]['numeric_day_of_week'] = $numeric_day_of_week; // ex. 4 = Thursday.
+        $required_shifts[$counter]['exists'] = 0; // This will be used to flag the shift as existing in the schedule.
+        $counter++;
+        //print $row->name . ' ' . $row->value . '<br />';
+      }
+
+     // print_r($required_shifts);exit;
+
+      // @TODO. 2 choices, I think. 1. For each required shift, query xray_sked to see if the day in question has the corresponding required shift. (ie. any null result means the shift is missing. 2. $all_shifts_in_month array holds all shift info - can loop through that looking for all required shifts on particular day, rinse, repeat.
+
+      // Playing with #2 option on bus to Tartu.
+      $day_to_check = $year . '-' . $month . '-' . $padded_x;
+      foreach ($required_shifts as $req_index => $required) {
+        foreach ($all_shifts_in_month as $shift_ind => $shift) {
+          if (strpos($shift['code'], $required['shift']) !== FALSE 
+              && $required['numeric_day_of_week'] == date('w', strtotime($shift['work_date']))
+              && $shift['work_date'] == $day_to_check) {
+            // Flag that shift is accounted for.
+            //print $required['shift'] . ' which is required on ' . $required['numeric_day_of_week'] . ' is accounted for on ' . $shift['work_date'] . '<br />';
+            $required_shifts[$req_index]['exists'] = 1;
+          }
+        }
+      }
+
+      // If there is still an $required_shifts[$req_index]['exists'] = 0, then that shift must be missing.
+      //print_r($required_shifts);exit;
+      foreach ($required_shifts as $req_index => $required) {
+        if ($required['exists'] == 0):
+          $missing_shifts[] = $required['shift'] . ',' . $day_to_check;
+        endif;
+      }
+    }
+
+    $objMissing = new stdClass();
+    $objMissing->flag = 0;
+    $objMissing->status = 'status';
+    $objMissing->msg = '';
+    $objMissing->strOutput = '';
+
+    // If we have missing shifts, let them know about it.
+    if (count($missing_shifts) > 0) {
+      $strOutput = '<table class="missing-shifts">';
+      $counter = 1;
+      foreach ($missing_shifts as $key => $value) {
+        $odd_even = ($counter % 2) ? 'odd' : 'even';
+        $boom = explode(',', $value);
+        $strOutput .= '<tr class="' . $odd_even . '"><td>' . $boom[0] . '</td><td>' . $boom[1] . '</td></tr>';
+        $counter++;
+      }
+      $strOutput .= '</table>';
+
+      $strOutput = '<h2>' . t('Missing Shifts for @date', array('@date' => date('F Y', strtotime($day)))) . '!</h2><p>' . t('Please note that this depends on the accuracy of <a href="/admin/config/sked/shiftdays" title="Assign Shifts to Days of Week">assigning shifts to particular days of the week</a>.') . '</p>' . $strOutput;
+
+      // We have missing shifts, populate object accordingly.
+      $objMissing->flag = 1;
+      $objMissing->status = 'error';
+      $objMissing->msg = t('Missing Shifts');
+      $objMissing->strOutput = $strOutput;    
+
+    }
+    else {
+      $strOutput = t('No missing shifts detected for @date', array('@date' => date('M Y', strtotime($day))));
+
+      $objMissing->msg = t('No Missing Shifts');
+      $objMissing->strOutput = $strOutput;    
+    }
+
+    return $objMissing;
+
+  }
+  
+  
+
+}
+
+
+/**
+ * Custom access check called from sked_plugin_access_role.
+ * Based on views_check_roles.
+ */
+function sked_check_roles_views($account = NULL) {
+
+  $access = FALSE;
+
+  global $user;
+  $roles = array_keys($user->roles);
+
+  // Reg expression match for shift code - is it south lake, mackenzie, clinic? Returns 1 (success) or 0.
+  $srhc = preg_match('/[szqpe*]/i', arg(3));
+  $hmxray = preg_match('/[cyqpe*]/i', arg(3));
+  $xra = preg_match('/[dvb]/i', arg(3));
+
+  // Check
+  foreach ($roles as $key => $value) {
+
+    // admin and rads can see everything.
+    if ($user->uid ==1 || $value == 3 || $value == 4): // superuser, admin=3, rad=4.
+      $access = TRUE;
+      break;
+    endif;
+
+    // Role ids: south lake = 6, mackenzie health = 7, clinic = 8.
+    if ($srhc && $value == 6):
+      $access = TRUE;
+      break;
+    endif;
+
+    if ($hmxray && $value == 7):
+      $access = TRUE;
+      break;
+    endif;
+
+    if ($xra && $value == 8):
+      $access = TRUE;
+      break;
+    endif;
+  }
+
+  return $access;
+}
+
+/**
+ * Break up string into component shift codes.
+ * Ex. C1V = C1 V, S7, C1Q = C1 Q etc.
+ */
+function sked_parse_code_for_template($code_to_parse, &$row) {
+  
+  $strOutput = '';
+
+  // Taking care of rounds first of all.
+  if ($row->xray_sked_code_type == 'round' || $row->xray_sked_code_type == 'rounds'):
+    $arrRounds = _sked_build_rotation_round_array('round');
+
+    foreach ($arrRounds as $nid => $node) {
+
+      if (stristr($code_to_parse, $node->title) !== FALSE):
+
+        $strOutput .= '<a href="#" title="' . $node->title . ' ' . $node->body['und'][0]['safe_value'] . '" class="beautytips">' . $node->title . '</a> ';
+
+      endif; 
+    }
+
+    if (strlen($strOutput) > 0) {
+      return $strOutput;
+    }
+    else {
+      // If nothing else, return the original shift code text to display on calendar.
+      return $code_to_parse;
+    }
+
+  endif;
+
+  // If we get to here we are dealing with rotations.
+  // E, *, Q, QQ, P, PP, V, D, B, Y, Z
+
+  // First filter out non-combo shifts.
+  // If only 1 character long or 2 characters long with either C or S or PP or QQ.
+  if (strlen($code_to_parse) == 1 || 
+     (strlen($code_to_parse) == 2 && (strtoupper(substr($code_to_parse, 0, 1)) == 'S' 
+                                                            || strtoupper(substr($code_to_parse, 0, 1)) == 'C' 
+                                                            || strtoupper($code_to_parse) == 'PP' 
+                                                            || strtoupper($code_to_parse) == 'QQ'))):
+
+      // Avoid php warnings that arise from empty content fields. (ex. Phone extension field may not have content.)
+      $field_extension = (isset($row->field_field_extension[0]['raw']['safe_value'])) ? $row->field_field_extension[0]['raw']['safe_value'] : '';
+      $field_body = (isset($row->field_body[0]['raw']['safe_value'])) ? $row->field_body[0]['raw']['safe_value'] : '';
+
+      $strOutput = '<a href="/shift-calendar-work-date-ts/month/' . date('Y-m', $row->xray_sked_work_date_ts) . '/' . $row->xray_sked_code . '" title="' . $row->node_xray_sked_title . ' ext' . $field_extension . ' ' . $field_body . '" class="beautytips">' . $row->xray_sked_code . '</a>';
+
+    return $strOutput;
+
+  endif;
+
+  // If we have gotten to here, then we are dealing with combo shifts.
+  // First get all the shifts we have described in content. (ie. rotation content type)
+  $arrShifts = _sked_build_rotation_round_array('rotation');
+  $separated_shifts = array();
+
+  foreach ($arrShifts as $nid => $node) {
+
+    // When we find matching shift code strings, start building output.
+    if (stristr($code_to_parse, $node->field_shift_code['und'][0]['value']) !== FALSE):
+
+      $shift_code = (isset($node->field_shift_code['und'][0]['value'])) ? $node->field_shift_code['und'][0]['value'] : '';
+      $field_extension = (isset($node->field_extension['und'][0]['safe_value'])) ? $node->field_extension['und'][0]['safe_value'] : '';
+      $field_body = (isset($node->body['und'][0]['safe_value'])) ? $node->body['und'][0]['safe_value'] : '';
+
+      // Load an array with the different shift codes. Later (next block of code) will discern P from PP situations (ex. PPS5) and unset as necessary.
+      $separated_shifts[$shift_code] = '<a href="/shift-calendar-work-date-ts/month/' . date('Y-m', $row->xray_sked_work_date_ts) . '/' . $shift_code . '" title="' . $node->title . ' ext ' . $field_extension . ' ' . $field_body . '" class="beautytips">' . $shift_code . '</a> ';
+
+    endif; 
+  }
+
+
+  // Check for P vs PP situations and unset as necessary.
+  foreach ($separated_shifts as $key => $value) {
+    $double_key = $key . $key;
+    if (array_key_exists($double_key, $separated_shifts)):
+      unset($separated_shifts[$key]);
+    endif;
+  }
+
+  // Compare new output order to old output order.
+  $new_order = implode(array_keys($separated_shifts), '');
+
+  if ($new_order !== $code_to_parse) {
+    // watchdog('xray', $new_order . ' should be ' . $code_to_parse);    
+    $separated_shifts = array_reverse($separated_shifts);
+  }
+
+  // Put array back into string for output.
+  $strOutput = implode($separated_shifts, '');
+
+  if (strlen($strOutput) > 0) {
+    return $strOutput;
+  }
+  else {
+    // If nothing else, return the original shift code text to display on calendar.
+    return $code_to_parse;
+  }
+
+}
+
+
+/**
+ * All published shift codes or rounds into array.
+ */
+function _sked_build_rotation_round_array($type = 'rotation') {
+
+  $query = new EntityFieldQuery();
+    $query
+      ->entityCondition('entity_type', 'node', '=')
+      ->propertyCondition('type', $type, '=')
+      ->propertyCondition('status', 1, '=')
+      ->propertyOrderBy('title	', 'ASC');
+
+  $result = $query->execute();
+
+  $nids = array_keys($result['node']);
+  $shifts = entity_load('node', $nids);
+
+  // Move "*" (nid = 38) shift info to end of array.
+  if ($type == 'rotation'):
+    $temp = array();
+    $temp = $shifts[38];
+    unset($shifts[38]);
+    array_push($shifts, $temp);
+  endif;
+
+  return $shifts;
+}
+
+
+/**
+ * Get phone extension based on shift code.
+ */
+function _sked_get_extension($shift_code = NULL) {
+
+  // Hack to display extensions for C1V combo code. 04.02.2014.
+  if ($shift_code == 'C1V') {
+    $c1_ext = _sked_get_extension('C1');
+    $v_ext = _sked_get_extension('V');
+    return $c1_ext . ' (C1) ' . $v_ext . ' (V)';
+  }
+
+  // Get rid of call sign "*" as it has no extension.
+  $shift_code = str_replace('*', '', $shift_code);
+
+  if ($shift_code === NULL || $shift_code == '') {
+    return FALSE;
+  }
+
+  $query = new EntityFieldQuery();
+    $query
+      ->entityCondition('entity_type', 'node', '=')
+      ->propertyCondition('type', 'rotation', '=')
+      ->propertyCondition('status', 1, '=')
+      ->propertyOrderBy('title	', 'ASC');
+
+  $result = $query->execute();
+
+  $nids = array_keys($result['node']);
+  $shifts = entity_load('node', $nids);
+
+  foreach ($shifts as $key => $value) {
+    if ($shift_code == $value->field_shift_code['und'][0]['value']) {
+      return $value->field_extension['und'][0]['value'];
+    }
+  }
+
+}

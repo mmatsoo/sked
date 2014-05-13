@@ -1,0 +1,97 @@
+td {border: solid thin black;}
+#doc_overlay {position: absolute;z-index: 100;top: 200px;left: 475px;border: solid thin black;background: #efe;padding: 10px;width:25%;height:10%;}
+.right {text-align: right;}
+.smaller {font-size: 0.85em;}
+
+body {/* background: #009900; */}
+
+
+/* @TODO. Get rid of !important rules. Using them for now because this calendar css is a morass of selectors. */
+div.calendar div.rotation {}
+div.calendar div.rounds {background: none repeat scroll 0 0 #DD52CF !important;}
+/* div.calendar div.Hematology {background: none repeat scroll 0 0 #fa8201 !important;}
+div.calendar div.Urology {background: none repeat scroll 0 0 #09F000 !important;}
+div.calendar div.MH.Urology {background: none repeat scroll 0 0 #ebaf1e !important;}
+div.calendar div.SL.Urology {background: none repeat scroll 0 0 #ff0047 !important;}
+div.calendar div.Thoracic {background: none repeat scroll 0 0 #066647 !important;}
+div.calendar div.Surg {background: none repeat scroll 0 0 #000247 !important;}
+div.calendar div.SL.Surg {background: none repeat scroll 0 0 #666247 !important;}
+div.calendar div.MH.Surg {background: none repeat scroll 0 0 #aa0907 !important;}
+div.calendar div.Breast {background: none repeat scroll 0 0 #096667 !important;}
+div.calendar div.rotation.call-1 {background: none repeat scroll 0 0 red !important;} */
+
+
+div.calendar div.MH {background: none repeat scroll 0 0 #d86dcd !important;} /* MacKenzie light purple */
+div.calendar div.SL {background: none repeat scroll 0 0 #f9f750 !important;} /* Southlake yellow */
+
+div.calendar div.events,
+div.calendar div.meetings {
+  background: none repeat scroll 0 0 #85fdf3 !important; /* Events/meetings have light blue */
+  /* Erik also said??? "The personal right sidebar red could be good for all events and meetings. PLMPC events have that same red." */
+}
+
+
+div.calendar-calendar  div.inner div.item div.view-item div.calendar {
+  overflow: visible;
+}
+
+div.bt-wrapper div.bt-content {
+  color: #000;
+}
+
+div.rounds {
+}
+
+.rad-heading {background: #5b2d7f;}
+.rad-heading td {color: #ffffff;font-size: 2em;}
+.odd {background: #ffffff;}
+.even {background: #cccccc;}
+
+.error {}
+div.error {padding: 1em;border: solid 3px #ff0000;background: #f7b5b2;margin-top: 1em;}
+div.error ul {margin-left: 2em;}
+
+div.no_error {padding: 1em;border: solid 3px #00ff00;background: #33c93a;}
+
+/* Assign shifts to days of week. */
+.shift-day-wrapper {float:left;width:12%;padding: 0 2px;border: solid 1px black;border-right: none;}
+
+.shift-day-wrapper.first, 
+.shift-day-wrapper.last {
+  background: #cccccc;
+}
+
+.shift-day-wrapper.first {background: #cccccc;}
+.shift-day-wrapper.last {border-right: solid 1px black;}
+
+#sked-shift-assign-day .form-submit {clear: both;margin-top: 1em;}
+
+table.missing-shifts {width: auto;}
+.missing-shifts td {border: solid 1px #BEBFB9;}
+
+.radlink {text-transform: uppercase;}
+
+div.call a.radlink,
+div.call a.beautytips {
+  color: #ff0000;
+}
+
+/* Week calendar's shift code div height way too short. */
+.page-calendar-work-date-ts-week .calendar-calendar .week-view #multi-day-container, 
+.page-calendar-work-date-ts-week .calendar-calendar .day-view #multi-day-container, 
+.view-schedule .calendar-calendar .week-view #multi-day-container,
+.view-schedule .calendar-calendar .day-view #multi-day-container {
+  height: auto;
+}
+
+
+aside.region-sidebar-first {
+  margin-top: 1em;
+}
+
+.page-node-50 .even {
+  background: none;
+  color: red;
+  font-weight: bold;
+  font-size: 16px;
+}

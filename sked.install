@@ -1,0 +1,99 @@
+<?php
+
+/**
+ * @file
+ * Installation routines for the sked module.
+ */
+
+/**
+ * Implements hook_install().
+ */
+function sked_install() {
+  // This is fired after hook_schema creates database table(s).
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function sked_uninstall() {
+}
+
+/**
+ * Implements hook_schema().
+ */
+function sked_schema() {
+  $schema = array();
+
+  // Stores schedule information, tying together work date, shift and radiologist.
+  $schema['xray_sked'] = array(
+    'description' => 'Schedule information',
+    'fields' => array(
+      'sid' => array(
+        'description' => 'Primary key',
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'uid' => array(
+        'description' => 'Drupal user ID for radiologist',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'nid' => array(
+        'description' => 'Node ID for rotation',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'rad_id' => array(
+        'description' => 'Legacy radiologist ID from old system. Here for reference.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => FALSE,
+      ),
+     'code' => array(
+        'description' => 'Code for the rotation or round.', 
+        'type' => 'varchar', 
+        'length' => 50, 
+        'not null' => TRUE, 
+        'default' => 'NA',
+      ), 
+     'code_type' => array(
+        'description' => 'Rotation? Round?', 
+        'type' => 'varchar', 
+        'length' => 50, 
+        'not null' => TRUE, 
+        'default' => 'rotation',
+      ), 
+      'call_flag' => array(
+        'description' => 'On Call?',
+        'type' => 'int',
+        'size' => 'tiny',
+        'unsigned' => TRUE,
+        'not null' => FALSE,
+        'default' => 0,
+      ),
+      'work_date' => array(
+        'description' => 'Work Date',
+        'mysql_type' => 'DATE', // YYYY-MM-DD
+        'not null' => TRUE,
+      ),
+      'work_date_ts' => array(
+        'description' => 'Timestamp of the work date',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+    ),
+    'indexes' => array(
+      'uid' => array('uid'),
+      'rad_id' => array('rad_id'),
+      'code' => array('code'),
+      'work_date' => array('work_date'),
+    ),
+    'primary key' => array('sid'),
+  );
+
+  return $schema;
+}

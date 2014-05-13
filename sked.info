@@ -1,0 +1,17 @@
+name = Radiologist Schedule
+description = "Upload schedule in CSV format."
+package = Xray
+core = 7.x
+
+files[] = includes/sked_csv_upload.inc
+files[] = includes/sked_shift_summary.inc
+files[] = includes/views/sked.views.inc
+files[] = includes/views/plugins/sked_plugin_access.inc
+
+configure=admin/config/sked/settings
+
+stylesheets[all][] = css/sked.css
+
+scripts[] = js/sked.js
+
+

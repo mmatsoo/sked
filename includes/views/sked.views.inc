@@ -86,7 +86,7 @@ function sked_views_data() {
 							),
 							'argument' => array(
 								  'handler' => 'views_handler_argument_numeric',
-							),
+							),							
 						),
 			'code' => array(
 							   'title' => t('Code'),

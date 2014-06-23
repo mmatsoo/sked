@@ -185,7 +185,7 @@ function _sked_csv_upload_save_sked_info($form, &$form_state) {
 					  'nid' => $shift_code_nid,
 					  'rad_id' => $objInfo->legacy_id,
 					  'code' => $sked_code,
-                      'code_type' => $code_type_flag,
+            'code_type' => $code_type_flag,
 					  'call_flag' => $call = (strpos($sked_code, '*') !== FALSE) ? 1 : 0,
 					  'work_date' => $objInfo->year . '-' . $objInfo->month . '-' . $day_for_insert,
 					  'work_date_ts' => $time_stamp,

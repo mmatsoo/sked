@@ -30,6 +30,14 @@ div.calendar div.meetings {
   /* Erik also said??? "The personal right sidebar red could be good for all events and meetings. PLMPC events have that same red." */
 }
 
+div.calendar div.event.optional {
+  background: none repeat scroll 0 0 #85fdf3 !important; /* Events/meetings have light blue */
+}
+
+div.calendar div.event.important {
+  background: none repeat scroll 0 0 #ff0000 !important; /* Events/meetings have light blue */
+}
+
 
 div.calendar-calendar  div.inner div.item div.view-item div.calendar {
   overflow: visible;
@@ -94,4 +102,24 @@ aside.region-sidebar-first {
   color: red;
   font-weight: bold;
   font-size: 16px;
+}
+
+/* Cardiac Thursdays in red */
+.thu.S5.rotation, .thu.S7.rotation, .wed.C5.evenweek.rotation {
+  background: none repeat scroll 0 0 #ffdddd !important;
+}
+
+.tue.S3.rotation, .wed.C3.oddweek.rotation {
+  background: none repeat scroll 0 0 #ddddff !important;
+}
+
+.thu.S5.rotation, .thu.S7.rotation, .wed.C5.evenweek.rotation, .tue.S3.rotation, .wed.C3.oddweek.rotation, 
+div.calendar div.rounds, div.calendar div.MH, div.calendar div.SL, div.calendar div.events,
+div.calendar div.meetings, div.calendar div.event.important, div.calendar div.event.optional {
+  width: 95%;
+  -webkit-border-radius: 5px;
+  -moz-border-radius: 5px;
+  border-radius: 5px;
+  margin-left: -3px;
+  padding-left: 3px;
 }

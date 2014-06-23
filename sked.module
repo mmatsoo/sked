@@ -769,13 +769,108 @@ function sked_views_query_alter(&$view, &$query) {
 
 
 /**
+ * Implementation of hook_node_insert().
+ * Adding this here because getting the
+ * event added to the schedule view as event
+ * content type would be too ugly.
+ * This way each event is also thrown into
+ * xray_sked table and it's associated with
+ * the actual event node here.
+ */
+function sked_node_insert($node) {
+  // watchdog('xray', 'in hook_node_insert <pre>' . print_r($node,true) . '</pre>');
+
+  // Event nodes get added to xray_sked table for ease of display.
+  if ($node->type === 'event') {
+
+    $importance_flag = ($node->field_importance['und'][0]['value'] == 'important') ? 1 : 0;
+    $work_date = date('Y-m-d', strtotime($node->field_event_start['und'][0]['value']));
+    $work_date_ts = strtotime($node->field_event_start['und'][0]['value']);
+    
+    $sid = db_insert('xray_sked')
+      ->fields(array(
+        'uid' => $node->uid,
+        'nid' => $node->nid,
+        'rad_id' => 0,
+        'code' => $node->title, // May as well pass node title here.
+        'code_type' => 'event', 
+        'call_flag' => $importance_flag,
+        'work_date' => $work_date,
+        'work_date_ts' => $work_date_ts,
+     ))
+     ->execute();
+
+     watchdog('xray', $node->title . ' nid:' . $node->nid . ' added into xray_sked table.');
+  }
+
+}
+
+
+/**
+ * Implementation of hook_node_update().
+ */
+function sked_node_update($node) {
+
+  // Should be in xray_sked table too so update here.
+  if ($node->type === 'event') {
+
+    // Find the sid from xray_sked.
+    $sked_id = db_query("SELECT sid FROM {xray_sked} WHERE nid = :nid", array(':nid' => $node->nid))->fetchField();
+
+    $importance_flag = ($node->field_importance['und'][0]['value'] == 'important') ? 1 : 0;
+    $work_date = date('Y-m-d', strtotime($node->field_event_start['und'][0]['value']));
+    $work_date_ts = strtotime($node->field_event_start['und'][0]['value']);
+    
+    $sid = db_update('xray_sked')
+      ->fields(array(
+        'uid' => $node->uid,
+        'nid' => $node->nid,
+        'rad_id' => 0,
+        'code' => $node->title, // May as well pass node title here.
+        'code_type' => 'event', 
+        'call_flag' => $importance_flag,
+        'work_date' => $work_date,
+        'work_date_ts' => $work_date_ts,
+     ))
+     ->condition('sid', $sked_id, '=')
+     ->execute();
+  }
+
+}
+
+
+/**
+ * Implementation of hook_node_delete().
+ */
+function sked_node_delete($node) {
+  // Clean-up xray_sked table if an event node is deleted.
+  if ($node->type === 'event') {
+    db_delete('xray_sked')->condition('nid', $node->nid)->execute();
+  }
+}
+
+
+/**
+ * Event info for calendar view.
+ */
+function _sked_get_event_info_for_template($nid) {
+  $node = node_load($nid);
+  // @todo. Use l function.
+  // return l($node->title, 'node/' . $node->nid);
+  $strOutput = '<a href="/node/' . $node->nid . '" title="' . $node->body['und'][0]['value'] . '" class="beautytips">' . $node->title . '</a>';
+
+  return $strOutput;  
+}
+
+
+
+/**
  * Changing operator and value to do LIKE '%C7%'
  * instead of = 'C7'.
  */
 function _sked_shift_code_operator_to_like($view, $query) {
   // @TODO. Remove watchdog.
   // watchdog('sked', 'view <pre>' . print_r($view, true) . '</pre>');
-  //print_r($query);exit;
 
   if ($view->current_display == 'by_shift'):
     if ($query->where[0]['conditions'][0]['field'] == 'xray_sked.code' 
@@ -949,7 +1044,6 @@ function sked_missing_shift_check($day = '', $day_or_month = 'month') {
   }
 
   // @TODO. Figure out how to compare which shift should be on which day and which is missing.
-  //print_r($all_shifts_in_month);exit;
 
   // shift_day_' . $key . '_' . $counter. ex. shift_day_S2_2 is S2 for a Tuesday.
 
@@ -1003,8 +1097,6 @@ function sked_missing_shift_check($day = '', $day_or_month = 'month') {
         //print $row->name . ' ' . $row->value . '<br />';
       }
 
-     // print_r($required_shifts);exit;
-
       // @TODO. 2 choices, I think. 1. For each required shift, query xray_sked to see if the day in question has the corresponding required shift. (ie. any null result means the shift is missing. 2. $all_shifts_in_month array holds all shift info - can loop through that looking for all required shifts on particular day, rinse, repeat.
 
       // Playing with #2 option on bus to Tartu.
@@ -1022,7 +1114,6 @@ function sked_missing_shift_check($day = '', $day_or_month = 'month') {
       }
 
       // If there is still an $required_shifts[$req_index]['exists'] = 0, then that shift must be missing.
-      //print_r($required_shifts);exit;
       foreach ($required_shifts as $req_index => $required) {
         if ($required['exists'] == 0):
           $missing_shifts[] = $required['shift'] . ',' . $day_to_check;
@@ -1150,15 +1241,36 @@ function sked_parse_code_for_template($code_to_parse, &$row) {
   endif;
 
   // If we get to here we are dealing with rotations.
-  // E, *, Q, QQ, P, PP, V, D, B, Y, Z
+  // E, *, q, Q, qQ, P, PP, V, D, B, Y, Z
+  // Deal with the q vs Q conundrum. Erik wants to use q vs Q to differentiate between tasks.
+  //if ($code_to_parse === 'q' || $code_to_parse === 'Q'  || $code_to_parse === 'qQ' || $code_to_parse === 'Qq' || $code_to_parse === 'QQ'):
+  /*if (strtoupper($code_to_parse) === 'Q'):
+    $field_extension = (isset($row->field_field_extension[0]['raw']['safe_value'])) ? $row->field_field_extension[0]['raw']['safe_value'] : '';
+    $field_body = (isset($row->field_body[0]['raw']['safe_value'])) ? $row->field_body[0]['raw']['safe_value'] : '';
+
+    $strOutput = '<a href="/shift-calendar-work-date-ts/month/' . date('Y-m', $row->xray_sked_work_date_ts) . '/' . $row->xray_sked_code . '" title="' . $row->node_xray_sked_title . ' ext' . $field_extension . ' ' . $field_body . '" class="beautytips">' . $code_to_parse . '</a>';
+
+    // return $code_to_parse . 'xxx'; 
+    return $strOutput .'singleq';
+  endif;
+
+  if (strtoupper($code_to_parse) === 'QQ'):
+    $field_extension = (isset($row->field_field_extension[0]['raw']['safe_value'])) ? $row->field_field_extension[0]['raw']['safe_value'] : '';
+    $field_body = (isset($row->field_body[0]['raw']['safe_value'])) ? $row->field_body[0]['raw']['safe_value'] : '';
+
+    $strOutput = '<a href="/shift-calendar-work-date-ts/month/' . date('Y-m', $row->xray_sked_work_date_ts) . '/' . $row->xray_sked_code . '" title="' . $row->node_xray_sked_title . ' ext' . $field_extension . ' ' . $field_body . '" class="beautytips">' . $row->xray_sked_code . '</a>';
+
+    // return $code_to_parse . 'xxx'; 
+    return $strOutput . 'doubleqq';
+  endif;*/
 
   // First filter out non-combo shifts.
-  // If only 1 character long or 2 characters long with either C or S or PP or QQ.
+  // If only 1 character long or 2 characters long with either C or S or PP.
   if (strlen($code_to_parse) == 1 || 
      (strlen($code_to_parse) == 2 && (strtoupper(substr($code_to_parse, 0, 1)) == 'S' 
                                                             || strtoupper(substr($code_to_parse, 0, 1)) == 'C' 
                                                             || strtoupper($code_to_parse) == 'PP' 
-                                                            || strtoupper($code_to_parse) == 'QQ'))):
+                                                            ))): // || strtoupper($code_to_parse) === 'QQ'
 
       // Avoid php warnings that arise from empty content fields. (ex. Phone extension field may not have content.)
       $field_extension = (isset($row->field_field_extension[0]['raw']['safe_value'])) ? $row->field_field_extension[0]['raw']['safe_value'] : '';
@@ -1178,7 +1290,8 @@ function sked_parse_code_for_template($code_to_parse, &$row) {
   foreach ($arrShifts as $nid => $node) {
 
     // When we find matching shift code strings, start building output.
-    if (stristr($code_to_parse, $node->field_shift_code['und'][0]['value']) !== FALSE):
+    // if (stristr($code_to_parse, $node->field_shift_code['und'][0]['value']) !== FALSE):
+    if (strstr($code_to_parse, $node->field_shift_code['und'][0]['value']) !== FALSE):
 
       $shift_code = (isset($node->field_shift_code['und'][0]['value'])) ? $node->field_shift_code['und'][0]['value'] : '';
       $field_extension = (isset($node->field_extension['und'][0]['safe_value'])) ? $node->field_extension['und'][0]['safe_value'] : '';
@@ -1187,7 +1300,7 @@ function sked_parse_code_for_template($code_to_parse, &$row) {
       // Load an array with the different shift codes. Later (next block of code) will discern P from PP situations (ex. PPS5) and unset as necessary.
       $separated_shifts[$shift_code] = '<a href="/shift-calendar-work-date-ts/month/' . date('Y-m', $row->xray_sked_work_date_ts) . '/' . $shift_code . '" title="' . $node->title . ' ext ' . $field_extension . ' ' . $field_body . '" class="beautytips">' . $shift_code . '</a> ';
 
-    endif; 
+    endif;
   }
 
 

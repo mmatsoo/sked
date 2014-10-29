@@ -447,6 +447,10 @@ function sked_block_info() {
     'info' => t('Jump forward or back several months'),
   );
 
+  $blocks['important_mtg'] = array(
+    'info' => t('Important XRA Event'),
+  );  
+
   return $blocks;
 }
 
@@ -512,10 +516,55 @@ function sked_block_view($delta = '') {
         $block['subject'] = t('Jump to');
         $block['content'] = drupal_get_form('_sked_build_jump_to_dd');
       break;
+
+    case 'important_mtg':
+        $block['subject'] = t('Important Meeting this Month');
+        $block['content'] = _sked_display_important_mtg();
+      break;      
   }
 
   return $block;
 }
+
+
+/**
+ * Recognise important meeting and display
+ * message for user.
+ */
+function _sked_display_important_mtg() {
+
+  // Get default value for dropdown.
+  $arg2 = arg(2);
+  $default_value = (isset($arg2)) ? $arg2 : date('Y-m');
+
+  $query = db_select('xray_sked', 'x');
+
+  $query
+    ->condition('code_type', 'event', '=')
+    ->condition('call_flag', '1', '=')
+    ->condition('work_date', date('Y-m-d'), '>=')
+    ->condition('work_date', $default_value . '-01', '>=')
+    ->condition('work_date', $default_value . '-' . cal_days_in_month(CAL_GREGORIAN, date('m', strtotime($default_value . '-01')), date('Y', strtotime($default_value . '-01'))), '<=')
+    ->fields('x', array('nid', 'code', 'work_date'))
+    ->orderBy('work_date');
+
+  $result = $query->execute();
+
+  $strOutput = '';
+  // Only return if we have something important to return.
+  if ($result->rowCount() > 0) {
+    $strOutput .= '<ul>';
+    foreach($result as $row) {
+      $strOutput .= '<li>' . $row->work_date . ': ' . $row->code . '</li>';
+    }
+
+    $strOutput .= '</ul><p class="small extra-info extrainfo">' . t('See calendar for more details') . '</p>';
+  }
+
+  return $strOutput;
+
+}
+
 
 
 /**

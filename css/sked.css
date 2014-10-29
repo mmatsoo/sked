@@ -124,12 +124,16 @@ div.calendar div.meetings, div.calendar div.event.important, div.calendar div.ev
   padding-left: 3px;
 }
 
-.block-sked-important-mtg {
+.block-sked-important-mtg #imp-mtg {
   background-color: red;
   padding: 1em;
 }
 
-.block-sked-important-mtg ul li {
+.block-sked-important-mtg #imp-mtg ul li {
   list-style: none;
   font-size: 1.6em;
+}
+
+.block-my-shift #imp-mtg ul li {
+  list-style: none;
 }

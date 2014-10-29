@@ -518,7 +518,7 @@ function sked_block_view($delta = '') {
       break;
 
     case 'important_mtg':
-        $block['subject'] = t('Important Meeting this Month');
+        $block['subject'] = ''; // Will place title in content.
         $block['content'] = _sked_display_important_mtg();
       break;      
   }
@@ -550,15 +550,16 @@ function _sked_display_important_mtg() {
 
   $result = $query->execute();
 
-  $strOutput = '';
+  $strOutput = '<!-- rowCount:' . $result->rowCount() . ' ' . $default_value . '-01' . ' to ' . $default_value . '-' . cal_days_in_month(CAL_GREGORIAN, date('m', strtotime($default_value . '-01')), date('Y', strtotime($default_value . '-01'))) . ' -->';
   // Only return if we have something important to return.
   if ($result->rowCount() > 0) {
+    $strOutput .= '<div id="imp-mtg"><h3>' . t('Important Meeting Coming Up') . '</h3>';
     $strOutput .= '<ul>';
     foreach($result as $row) {
-      $strOutput .= '<li>' . $row->work_date . ': ' . $row->code . '</li>';
+      $strOutput .= '<li>Meeting on: ' . date('D, d M Y', strtotime($row->work_date)) . '. <em>' . $row->code . '</em></li>';
     }
 
-    $strOutput .= '</ul><p class="small extra-info extrainfo">' . t('See calendar for more details') . '</p>';
+    $strOutput .= '</ul><p class="small extra-info extrainfo">' . t('See calendar for more details') . '</p></div>';
   }
 
   return $strOutput;

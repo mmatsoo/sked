@@ -97,6 +97,7 @@ function _sked_csv_upload_save_sked_info($form, &$form_state) {
       $num_deleted = db_delete('xray_sked')
         ->condition('work_date', $objInfo->year . '-' . $objInfo->month . '-01', '>=')
         ->condition('work_date', $objInfo->year . '-' . $objInfo->month . '-' . $objInfo->numDaysInMonth, '<=')
+        ->condition('code_type', 'event', '<>')
         ->execute();
     endif;
 

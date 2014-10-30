@@ -850,7 +850,7 @@ function sked_node_insert($node) {
      ))
      ->execute();
 
-     watchdog('xray', $node->title . ' nid:' . $node->nid . ' added into xray_sked table.');
+     // watchdog('xray', $node->title . ' nid:' . $node->nid . ' added into xray_sked table.');
   }
 
 }
@@ -1450,4 +1450,74 @@ function _sked_get_extension($shift_code = NULL) {
     }
   }
 
+}
+
+
+/**
+ * Helper function.
+ * Called from theme file calendar-month-col.tpl.php.
+ * Check if an event exists for given date.
+ * @param
+ *   Date
+ * @return
+ *   Boolean
+ */
+function _sked_check_date_for_event($date = NULL) {
+  // Just return false if we do not have a date to check.
+  if ($date === NULL) {
+    return FALSE;
+  }
+
+  // Should have nicely formatted date, build query.
+  $query = db_select('xray_sked', 'x');
+  $query
+    ->condition('code_type', 'event', '=')
+    ->condition('call_flag', '1', '=')
+    ->condition('work_date', $date, '=')
+    ->fields('x', array('nid'))
+    ->orderBy('code');
+
+  $result = $query->execute();
+
+  if ($result->rowCount() > 0) {
+    return TRUE;
+  }
+  else {
+    return FALSE;
+  }
+
+}
+
+
+/**
+ * Helper function.
+ * Called from theme file calendar-month-col.tpl.php.
+ * Should only be called once existence of event is confirmed.
+ * @param
+ *   Date
+ * @return
+ *   String - html for event info to be displayed in calendar.
+ */
+function _sked_get_event_info_for_date($date = NULL) {
+
+  if ($date === NULL) {
+    return '';
+  }
+
+  $query = db_select('xray_sked', 'x');
+  $query
+    ->condition('code_type', 'event', '=')
+    ->condition('call_flag', '1', '=')
+    ->condition('work_date', $date, '=')
+    ->fields('x', array('nid', 'code'))
+    ->orderBy('code');
+
+  $result = $query->execute();
+
+  $strOutput = '';
+  foreach ($result as $row) {
+    $strOutput .= $row->code . '<br />';
+  }
+
+  return $strOutput;
 }

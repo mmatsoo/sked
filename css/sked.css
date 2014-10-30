@@ -137,3 +137,11 @@ div.calendar div.meetings, div.calendar div.event.important, div.calendar div.ev
 .block-my-shift #imp-mtg ul li {
   list-style: none;
 }
+
+/* Important event notice in calendar. */
+.calendar-imp-event {
+  color: #ffffff;
+  background: #ff0000;
+  padding: 3px;
+  font-weight: bold;
+}

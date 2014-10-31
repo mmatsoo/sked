@@ -140,8 +140,12 @@ div.calendar div.meetings, div.calendar div.event.important, div.calendar div.ev
 
 /* Important event notice in calendar. */
 .calendar-imp-event {
-  color: #ffffff;
   background: #ff0000;
-  padding: 3px;
-  font-weight: bold;
+  padding: 3px;  
 }
+
+.view-schedule .calendar-imp-event a.beautytips {
+  color: #ffffff;
+  font-weight: normal;
+}
+

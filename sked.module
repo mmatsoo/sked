@@ -1516,7 +1516,10 @@ function _sked_get_event_info_for_date($date = NULL) {
 
   $strOutput = '';
   foreach ($result as $row) {
-    $strOutput .= $row->code . '<br />';
+    $node = node_load($row->nid);    
+    // The l() strips, quite correctly, html tags from title attribute.
+    // $strOutput .= l($row->code, 'node/' . $row->nid, array('html' => TRUE, 'attributes' => array('class' => 'beautytips', 'title' =>$node->body[LANGUAGE_NONE][0]['value'])));
+    $strOutput .= '<a href="/node/' . $row->nid . '" title="' . $node->body[LANGUAGE_NONE][0]['value'] . '" class="beautytips">' . $row->code . '</a>';
   }
 
   return $strOutput;

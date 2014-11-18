@@ -109,9 +109,34 @@ aside.region-sidebar-first {
   background: none repeat scroll 0 0 #ffdddd !important;
 }
 
-.tue.S3.rotation, .wed.C3.oddweek.rotation {
+/* .tue.S3.rotation */
+/* Specific rotations need to be baby blue. Kinda' random. 18-nov-2014 mm. */
+.fri.S3.rotation,
+.wed.C3.oddweek.rotation,
+.bop.C3.rotation, .bop.S3.rotation,
+.bdh.C3.rotation, .bdh.S3.rotation,
+.th.C3.rotation, .th.S3.rotation,
+.zia.C3.rotation, .zia.S3.rotation,
+.zia.jan09-2015.rotation,
+.th.jan16-2015.rotation,
+.zia.jan19-2015.rotation,
+.bop.jan23-2015.rotation,
+.zia.jan28-2015.rotation,
+.bdh.jan30-2015.rotation,
+.bdh.feb06-2015.rotation,
+.th.feb13-2015.rotation,
+.zia.feb20-2015.rotation,
+.zia.feb23-2015.rotation,
+.bdh.feb27-2015.rotation,
+.bop.mar06-2015.rotation,
+.bdh.mar13-2015.rotation,
+.th.mar20-2015.rotation,
+.bop.mar27-2015.rotation,
+.th.mar30-2015.rotation,
+.zia.mar31-2015.rotation {
   background: none repeat scroll 0 0 #ddddff !important;
 }
+
 
 .thu.S5.rotation, .thu.S7.rotation, .wed.C5.evenweek.rotation, .tue.S3.rotation, .wed.C3.oddweek.rotation, 
 div.calendar div.rounds, div.calendar div.MH, div.calendar div.SL, div.calendar div.events,

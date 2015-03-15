@@ -134,8 +134,10 @@ aside.region-sidebar-first {
 .bop.mar27-2015.rotation,
 .th.mar30-2015.rotation,
 .zia.mar31-2015.rotation {
-  background: none repeat scroll 0 0 #ddddff !important;
+  background: none repeat scroll 0 0 #ffdddd !important; /* Erik asked to change MH US from baby blue (#ddddff) to the Thurs cardiac pink (#ffdddd) */
 }
+
+
 
 
 .thu.S5.rotation, .thu.S7.rotation, .wed.C5.evenweek.rotation, .tue.S3.rotation, .wed.C3.oddweek.rotation, 
@@ -173,4 +175,3 @@ div.calendar div.meetings, div.calendar div.event.important, div.calendar div.ev
   color: #ffffff;
   font-weight: normal;
 }
-

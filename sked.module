@@ -601,22 +601,35 @@ function _sked_build_jump_to_dd() {
  * Helper function to jump back or forward 6 months.
  */
 function _sked_build_jump_to_dropdown_options() {
+  
+  $current_year = date('Y');
+  $next_year = $current_year + 1;
+  $last_year = $current_year - 1;
+  $current_month = date('n');
+  $day_to_use = '15';
 
-  $options = array(
-    date('Y-m', strtotime('6 months ago', time())) => date('M Y', strtotime('6 months ago', time())),
-    date('Y-m', strtotime('5 months ago', time())) => date('M Y', strtotime('5 months ago', time())),
-    date('Y-m', strtotime('4 months ago', time())) => date('M Y', strtotime('4 months ago', time())),
-    date('Y-m', strtotime('3 months ago', time())) => date('M Y', strtotime('3 months ago', time())),
-    date('Y-m', strtotime('2 months ago', time())) => date('M Y', strtotime('2 months ago', time())),
-    date('Y-m', strtotime('1 month ago', time())) => date('M Y', strtotime('1 month ago', time())),
-    date('Y-m') => date('M Y'),
-    date('Y-m', strtotime('+1 month', time())) => date('M Y', strtotime('+1 month', time())),
-    date('Y-m', strtotime('+2 months', time())) => date('M Y', strtotime('+2 months', time())),
-    date('Y-m', strtotime('+3 months', time())) => date('M Y', strtotime('+3 months', time())),
-    date('Y-m', strtotime('+4 months', time())) => date('M Y', strtotime('+4 months', time())),
-    date('Y-m', strtotime('+5 months', time())) => date('M Y', strtotime('+5 months', time())),
-    date('Y-m', strtotime('+6 months', time())) => date('M Y', strtotime('+6 months', time())),
+  // Figure out month to start with.
+  $months = array(
+    '1' => array($last_year . '-08', $last_year . '-09', $last_year . '-10', $last_year . '-11', $last_year . '-12', $current_year . '-01', $current_year . '-02', $current_year . '-03', $current_year . '-04', $current_year . '-05', $current_year . '-06'),
+    '2' => array($last_year . '-09', $last_year . '-10', $last_year . '-11', $last_year . '-12', $current_year . '-01', $current_year . '-02', $current_year . '-03', $current_year . '-04', $current_year . '-05', $current_year . '-06', $current_year . '-07'),
+    '3' => array($last_year . '-10', $last_year . '-11', $last_year . '-12', $current_year . '-01', $current_year . '-02', $current_year . '-03', $current_year . '-04', $current_year . '-05', $current_year . '-06', $current_year . '-07', $current_year . '-08'),
+    '4' => array($last_year . '-11', $last_year . '-12', $current_year . '-01', $current_year . '-02', $current_year . '-03', $current_year . '-04', $current_year . '-05', $current_year . '-06', $current_year . '-07', $current_year . '-08', $current_year . '-09'),
+    '5' => array($last_year . '-12', $current_year . '-01', $current_year . '-02', $current_year . '-03', $current_year . '-04', $current_year . '-05', $current_year . '-06', $current_year . '-07', $current_year . '-08', $current_year . '-09', $current_year . '-10'),
+    '6' => array($current_year . '-01', $current_year . '-02', $current_year . '-03', $current_year . '-04', $current_year . '-05', $current_year . '-06', $current_year . '-07', $current_year . '-08', $current_year . '-09', $current_year . '-10', $current_year . '-11'),
+    '7' => array($current_year . '-02', $current_year . '-03', $current_year . '-04', $current_year . '-05', $current_year . '-06', $current_year . '-07', $current_year . '-08', $current_year . '-09', $current_year . '-10', $current_year . '-11', $current_year . '-12'),
+    '8' => array($current_year . '-03', $current_year . '-04', $current_year . '-05', $current_year . '-06', $current_year . '-07', $current_year . '-08', $current_year . '-09', $current_year . '-10', $current_year . '-11', $current_year . '-12', $next_year . '-01'),
+    '9' => array($current_year . '-04', $current_year . '-05', $current_year . '-06', $current_year . '-07', $current_year . '-08', $current_year . '-09', $current_year . '-10', $current_year . '-11', $current_year . '-12', $next_year . '-01', $next_year . '-02'),
+    '10' => array($current_year . '-05', $current_year . '-06', $current_year . '-07', $current_year . '-08', $current_year . '-09', $current_year . '-10', $current_year . '-11', $current_year . '-12', $next_year . '-01', $next_year . '-02', $next_year . '-03'),
+    '11' => array($current_year . '-06', $current_year . '-07', $current_year . '-08', $current_year . '-09', $current_year . '-10', $current_year . '-11', $current_year . '-12', $next_year . '-01', $next_year . '-02', $next_year . '-03', $next_year . '-04'),
+    '12' => array($current_year . '-07', $current_year . '-08', $current_year . '-09', $current_year . '-10', $current_year . '-11', $current_year . '-12', $next_year . '-01', $next_year . '-02', $next_year . '-03', $next_year . '-04', $next_year . '-05'),
   );
+
+
+  $options = array();
+
+  foreach ($months[$current_month] as $value) {
+    $options[$value] = date('M Y', strtotime($value . '-' . $day_to_use));
+  }
 
   return $options;
 
